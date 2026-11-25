@@ -1,0 +1,16 @@
+# Add this service to the production compose stack on <prod-host IP>
+# (same project/network as congiuntura-live so openresty can reach it).
+#
+#   congiuntura-agent:
+#     image: nginx:alpine
+#     container_name: congiuntura-agent
+#     restart: unless-stopped
+#     volumes:
+#       - /opt/congiuntura-agent/site:/usr/share/nginx/html:ro
+#       - /opt/congiuntura-agent/nginx-default.conf:/etc/nginx/conf.d/default.conf:ro
+#
+# No ports published: openresty proxies congiuntura-agent.by.gg8.eu to
+# http://congiuntura-agent:80 over the compose network.
+#
+# /opt/congiuntura-agent/site is the contents of this repo's site/ folder
+# (rsync or git clone on the host — see DEPLOY.md).

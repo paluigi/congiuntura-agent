@@ -59,7 +59,7 @@ visitor's browser
 | `site/bridge/` | Action bridge other agent sites load (generated; shares no actions) |
 | `site/runtime/` | Browser runtime, copied unchanged from the skill |
 | `site/tests/` | Node tests: real runtime + real page code with a scripted model |
-| `deploy/` | nginx config, compose service, "Otari later" switch |
+| `deploy/` | nginx config (`nginx-default.conf`), compose snippet, deployment runbook (`DEPLOY.md`), "Otari later" switch |
 
 ## Build & test
 
@@ -94,7 +94,7 @@ get no `website_*` tools — their assistant points visitors at this site's page
 
 - [x] Phase 1 — read-only MCP server in congiuntura-live (PR: paluigi/congiuntura-live#2)
 - [x] Phase 2 — agentified static bundle (this repo)
-- [ ] Phase 3 — deploy at congiuntura-agent.by.gg8.eu
+- [ ] Phase 3 — deploy at congiuntura-agent.by.gg8.eu (**runbook ready**: `deploy/DEPLOY.md` — needs prod-host access: merge paluigi/congiuntura-live#2, deploy v0.8.0 + agent_ro user, nginx + DNS)
 - [ ] Phase 4 — submission (video, screenshots, devpost)
 
 ## License
