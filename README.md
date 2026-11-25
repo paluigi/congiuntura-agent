@@ -59,7 +59,7 @@ visitor's browser
 | `site/bridge/` | Action bridge other agent sites load (generated; shares no actions) |
 | `site/runtime/` | Browser runtime, copied unchanged from the skill |
 | `site/tests/` | Node tests: real runtime + real page code with a scripted model |
-| `deploy/` | nginx config (`nginx-default.conf`), compose snippet, deployment runbook (`DEPLOY.md`), "Otari later" switch |
+| `deploy/` | runbook (`DEPLOY.md`, Nginx Proxy Manager setup), nginx config, compose snippet, "Otari later" switch |
 
 ## Build & test
 

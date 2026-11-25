@@ -1,7 +1,8 @@
 # DEPLOY — congiuntura-agent Phase 3 runbook
 
 Copy-paste runbook for the production host **<prod-host IP>** (Ubuntu, Docker
-Compose, openresty in front). Two deployments are involved:
+Compose, **Nginx Proxy Manager** (NPM) managing traffic). Two deployments are
+involved:
 
 - **A. congiuntura-live v0.8.0** (the MCP server the agent bundle calls) — merge
   [paluigi/congiuntura-live#2](https://github.com/paluigi/congiuntura-live/pull/2)
@@ -66,6 +67,14 @@ docker exec -i -e P=<AGENT_RO_PASSWORD> "$MONGO_CONTAINER" mongosh --quiet \
 
 ## B. congiuntura-agent static bundle
 
+All containers (NPM, the bundle's nginx, congiuntura-live's app) talk over a
+shared docker network. Find its name first:
+
+```bash
+docker network ls                 # e.g. "proxy" — the network NPM is attached to
+docker inspect <npm-container> --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+```
+
 ```bash
 # 1. get the bundle onto the host
 sudo mkdir -p /opt/congiuntura-agent
@@ -75,27 +84,55 @@ sudo chown <user>:<user> /opt/congiuntura-agent
 #   rsync -av <repo>/deploy/nginx-default.conf <user>@<prod-host>:/opt/congiuntura-agent/
 # Option 2 — git clone on the host:
 #   git -C /opt/congiuntura-agent clone https://github.com/paluigi-moltis/congiuntura-agent repo
-#   (then symlink site/ and deploy/nginx-default.conf from repo/)
+#   (then point the volume mounts at repo/site and repo/deploy/nginx-default.conf)
 
 # 2. compose service — append the block from deploy/compose.snippet.yml to the
-#    host's main docker-compose.yml, then:
+#    compose file that shares the NPM network (or the main stack's), filling in
+#    the network name found above. The bundle's own nginx container serves the
+#    files and sets the special headers (CORS on public artifacts, CSP on the
+#    sandbox worker); NPM is only the front door. Then:
 docker compose up -d congiuntura-agent
-docker ps --format '{{.Names}} {{.Status}}' | grep congiuntura-agent
 
-# 3. openresty vhost — new server block proxying the subdomain:
-#    server {
-#      listen 443 ssl http2;
-#      server_name congiuntura-agent.by.gg8.eu;
-#      ssl_certificate     <same wildcard/cert as congiuntura.by.gg8.eu>;
-#      ssl_certificate_key <same>;
-#      location / { proxy_pass http://congiuntura-agent:80; }
-#    }
-#    (nginx -t && systemctl reload openresty)
+# 3. verify NPM can reach it (same network?):
+docker network inspect <npm-network> | grep congiuntura-agent
+docker exec <npm-container> curl -s -o /dev/null -w '%{http_code}\n' http://congiuntura-agent:80/
+#   → 200
+
+# 4. NPM Proxy Host — in the NPM web UI → Hosts → Proxy Hosts → Add proxy host:
+#      Domain Names:      congiuntura-agent.by.gg8.eu
+#      Scheme:            http
+#      Forward Hostname:  congiuntura-agent     (the container name)
+#      Forward Port:      80
+#      Websockets:        off (not needed)
+#      ⚠ Block common exploits: OFF. NPM's exploit-blocking adds
+#        X-Frame-Options: SAMEORIGIN, which would stop OTHER agent sites
+#        from loading bridge/action-bridge.html in a hidden frame — that
+#        framing is a core MVP interop feature.
+#      ⚠ Do NOT enable "Cache Assets" — the bundle must never be cached.
+#    SSL tab:     Request a new Let's Encrypt certificate (or pick the existing
+#                 wildcard cert if you have one) + Force HTTPS + HTTP/2
+#    Advanced:    leave empty — all special headers come from the upstream
+#                 container; NPM adds none of its own that would clash
+#    Save.
 #    HTTPS is REQUIRED in production: the visitor's API key lives in
 #    localStorage for this origin (MVP spec §4).
 
-# 4. DNS — add a record: congiuntura-agent.by.gg8.eu → <prod-host IP>
+# 5. DNS — add a record: congiuntura-agent.by.gg8.eu → <prod-host IP>
+#    (or to the host/IP NPM publishes; same IP as the other subdomains)
 ```
+
+### NPM gotchas for this bundle
+
+- **Do not add custom locations in NPM** for `/.well-known/`,
+  `agent-manifest.json` etc. — the upstream container already sets the CORS
+  headers there. Adding them again in NPM would produce duplicate
+  `Access-Control-Allow-Origin` headers (browsers reject duplicates with CORS
+  errors).
+- If you later need an NPM-wide header (e.g. HSTS is already handled by NPM's
+  SSL settings), verify with the check curls below that
+  `Access-Control-Allow-Origin` still appears exactly once.
+- NPM passes the visitor's `Origin` through untouched, which is what the MCP
+  CORS check on congiuntura-live needs — no extra config.
 
 ## Post-deploy checks (all must pass)
 
@@ -103,19 +140,21 @@ docker ps --format '{{.Names}} {{.Status}}' | grep congiuntura-agent
 # 1. page loads
 curl -s -o /dev/null -w '%{http_code}\n' https://congiuntura-agent.by.gg8.eu/          # 200
 
-# 2. public artifacts CORS
+# 2. public artifacts CORS (exactly ONE Access-Control-Allow-Origin line each)
 curl -s -I https://congiuntura-agent.by.gg8.eu/agent-manifest.json \
-  -H 'Origin: https://example.org' | grep -i access-control-allow-origin               # *
+  -H 'Origin: https://example.org' | grep -ci access-control-allow-origin           # 1
+curl -s -I https://congiuntura-agent.by.gg8.eu/agent-manifest.json \
+  -H 'Origin: https://example.org' | grep -i access-control-allow-origin            # *
 curl -s -I https://congiuntura-agent.by.gg8.eu/congiuntura_outlook.network.json \
-  -H 'Origin: https://example.org' | grep -i access-control-allow-origin               # *
+  -H 'Origin: https://example.org' | grep -i access-control-allow-origin            # *
 curl -s -I https://congiuntura-agent.by.gg8.eu/.well-known/nsdeploy.json \
-  -H 'Origin: https://example.org' | grep -i access-control-allow-origin               # *
+  -H 'Origin: https://example.org' | grep -i access-control-allow-origin            # *
 
 # 3. sandbox worker CSP
 curl -s -I https://congiuntura-agent.by.gg8.eu/runtime/sandbox-worker.js \
   | grep -i content-security-policy
 
-# 4. bridge frameable (no X-Frame-Options in the response)
+# 4. bridge frameable (NO X-Frame-Options anywhere in the response)
 curl -s -I https://congiuntura-agent.by.gg8.eu/bridge/action-bridge.html | head -20
 
 # 5. the bundle can reach the MCP from the agent origin (browser-equivalent)

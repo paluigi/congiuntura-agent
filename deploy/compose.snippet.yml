@@ -1,5 +1,6 @@
-# Add this service to the production compose stack on <prod-host IP>
-# (same project/network as congiuntura-live so openresty can reach it).
+# Add this service to the production compose stack on <prod-host IP>.
+# Traffic is managed by Nginx Proxy Manager (NPM) — the bundle's own nginx
+# container is just the upstream that serves files + the special headers.
 #
 #   congiuntura-agent:
 #     image: nginx:alpine
@@ -8,9 +9,19 @@
 #     volumes:
 #       - /opt/congiuntura-agent/site:/usr/share/nginx/html:ro
 #       - /opt/congiuntura-agent/nginx-default.conf:/etc/nginx/conf.d/default.conf:ro
+#     networks:
+#       - <the network NPM is on>   # e.g. proxy — see `docker network ls`
 #
-# No ports published: openresty proxies congiuntura-agent.by.gg8.eu to
-# http://congiuntura-agent:80 over the compose network.
+# networks:
+#   <the network NPM is on>:
+#     external: true
+#
+# IMPORTANT: no ports published — NPM reaches it over the shared docker
+# network at http://congiuntura-agent:80. The container and NPM MUST be on
+# the same network (check with: docker network inspect <net> | grep congiuntura).
+#
+# In NPM: add a Proxy Host — domain congiuntura-agent.by.gg8.eu,
+# forward host congiuntura-agent, port 80 (details in DEPLOY.md §B).
 #
 # /opt/congiuntura-agent/site is the contents of this repo's site/ folder
 # (rsync or git clone on the host — see DEPLOY.md).
