@@ -1,6 +1,6 @@
 # DEPLOY — congiuntura-agent Phase 3 runbook
 
-Copy-paste runbook for the production host **<prod-host IP>** (Ubuntu, Docker
+Copy-paste runbook for the production host (Ubuntu, Docker
 Compose, **Nginx Proxy Manager** (NPM) managing traffic). Two deployments are
 involved:
 
@@ -78,10 +78,10 @@ docker inspect <npm-container> --format '{{range $k,$v := .NetworkSettings.Netwo
 ```bash
 # 1. get the bundle onto the host
 sudo mkdir -p /opt/congiuntura-agent
-sudo chown <user>:<user> /opt/congiuntura-agent
-# Option 1 — rsync from a machine with the repo :
-#   rsync -av --delete <repo>/site/ <user>@<prod-host>:/opt/congiuntura-agent/site/
-#   rsync -av <repo>/deploy/nginx-default.conf <user>@<prod-host>:/opt/congiuntura-agent/
+sudo chown "$USER":"$USER" /opt/congiuntura-agent
+# Option 1 — rsync from a machine with the repo:
+#   rsync -av --delete site/ <user>@<prod-host>:/opt/congiuntura-agent/site/
+#   rsync -av deploy/nginx-default.conf <user>@<prod-host>:/opt/congiuntura-agent/
 # Option 2 — git clone on the host:
 #   git -C /opt/congiuntura-agent clone https://github.com/paluigi-moltis/congiuntura-agent repo
 #   (then point the volume mounts at repo/site and repo/deploy/nginx-default.conf)
@@ -118,7 +118,7 @@ docker exec <npm-container> curl -s -o /dev/null -w '%{http_code}\n' http://cong
 #    localStorage for this origin (MVP spec §4).
 
 # 5. DNS — add a record: congiuntura-agent.by.gg8.eu → <prod-host IP>
-#    (or to the host/IP NPM publishes; same IP as the other subdomains)
+#    (same IP the other subdomains of the site resolve to)
 ```
 
 ### NPM gotchas for this bundle

@@ -1,4 +1,5 @@
-# Add this service to the production compose stack on <prod-host IP>.
+# Add this service to the production compose stack (the host that runs the
+# congiuntura-live containers).
 # Traffic is managed by Nginx Proxy Manager (NPM) — the bundle's own nginx
 # container is just the upstream that serves files + the special headers.
 #
