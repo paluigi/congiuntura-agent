@@ -1,8 +1,24 @@
 # Deploying congiuntura-agent
 
-> **The authoritative runbook is [`DEPLOY.md`](DEPLOY.md)** — written for the
-> production setup (Nginx Proxy Manager fronting the containers on the shared
-> docker network). This file only keeps the "Otari later" switch.
+> **The authoritative runbook is [`DEPLOY.md`](DEPLOY.md)** — one Compose stack
+> (the congiuntura-live `docker-compose.yml`), fronted by Nginx Proxy Manager.
+> This file only keeps the maintainer notes: how the image is built, and the
+> "Otari later" switch.
+
+## Building the image
+
+The bundle ships as `paluigi/congiuntura-agent:<version>` on Docker Hub,
+multi-arch (`linux/amd64` + `linux/arm64`). The `Dockerfile` at the repo root is
+nginx + `site/` + `deploy/nginx-default.conf`; `site/tests/` and the rest of
+`deploy/` are kept out of the image by `.dockerignore`.
+
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t paluigi/congiuntura-agent:<version> -t paluigi/congiuntura-agent:latest --push .
+```
+
+Then point the `congiuntura-agent` service in the congiuntura-live
+`docker-compose.yml` at the new tag — there is nothing to build on the host.
 
 ## "Otari later" switch (BYOK-first → funded default)
 
@@ -24,6 +40,8 @@ To fund visitors' calls later with hosted Otari, change ONE file (`agent-manifes
 - `byok_router` stays a DIFFERENT URL from `base_url` (the build refuses a match):
   point `byok_router` at e.g. your Otari EU endpoint when you do this
 - The visitor's own key always takes precedence and is never sent to `base_url`
-- No network/runtime/dashboard change needed — rebuild not required (manifest is read at runtime)
+- No network/runtime/dashboard change needed — only `agent-manifest.json`
+  changes. The manifest is read at runtime; to ship the change, rebuild the
+  image (it is baked in — see "Building the image" above)
 
 Keep `llm_config.model_name` in the HOCON in sync with the router's models.

@@ -1,0 +1,12 @@
+# VCS / local tooling — never part of the build context
+.git/
+.gitignore
+.zcode/
+.kilo/
+
+# Only the nginx config ships from deploy/ (runbook and notes stay out)
+deploy/*
+!deploy/nginx-default.conf
+
+# Node test stubs are not part of the served bundle
+site/tests/
