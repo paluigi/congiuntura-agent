@@ -59,7 +59,8 @@ visitor's browser
 | `site/bridge/` | Action bridge other agent sites load (generated; shares no actions) |
 | `site/runtime/` | Browser runtime, copied unchanged from the skill |
 | `site/tests/` | Node tests: real runtime + real page code with a scripted model |
-| `deploy/` | runbook (`DEPLOY.md`, Nginx Proxy Manager setup), nginx config, compose snippet, "Otari later" switch |
+| `Dockerfile` | Static bundle → `paluigi/congiuntura-agent` image (nginx, multi-arch) |
+| `deploy/` | runbook (`DEPLOY.md`: one Compose stack + Nginx Proxy Manager), nginx config, image build notes, "Otari later" switch |
 
 ## Build & test
 
@@ -90,11 +91,27 @@ low spending limit when testing locally.
 provider you choose. The site host never sees your key. Other agent sites that call this network
 get no `website_*` tools — their assistant points visitors at this site's page.
 
+## Deploy
+
+The bundle ships as a prebuilt multi-arch image, `paluigi/congiuntura-agent:0.1.0`
+(`linux/amd64` + `linux/arm64`): nginx serving `site/` with the headers from
+`deploy/nginx-default.conf`. It runs as a third container in the congiuntura-live
+Compose stack (profile `agent`), behind the same Nginx Proxy Manager as the live
+site — nothing is built on or copied to the host.
+
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t paluigi/congiuntura-agent:0.1.0 -t paluigi/congiuntura-agent:latest --push .
+```
+
+Full runbook (Compose profile, read-only Mongo user, NPM proxy host, DNS, checks,
+rollback): [`deploy/DEPLOY.md`](deploy/DEPLOY.md).
+
 ## Status
 
-- [x] Phase 1 — read-only MCP server in congiuntura-live (PR: paluigi/congiuntura-live#2)
+- [x] Phase 1 — read-only MCP server in congiuntura-live (PR: paluigi/congiuntura-live#2, merged)
 - [x] Phase 2 — agentified static bundle (this repo)
-- [ ] Phase 3 — deploy at congiuntura-agent.by.gg8.eu (**runbook ready**: `deploy/DEPLOY.md` — needs prod-host access: merge paluigi/congiuntura-live#2, deploy v0.8.0 + agent_ro user, nginx + DNS)
+- [ ] Phase 3 — deploy at congiuntura-agent.by.gg8.eu (**runbook ready**: `deploy/DEPLOY.md` — one Compose stack: land the congiuntura-live compose change, create the `agent_ro` user, NPM proxy host + DNS)
 - [ ] Phase 4 — submission (video, screenshots, devpost)
 
 ## License
